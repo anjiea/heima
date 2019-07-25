@@ -17,7 +17,7 @@
               <span>我已阅读并同意用户协议和隐私条款</span>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" style="width:100%;" @click="login()">登录</el-button>
+              <el-button type="primary"  v-loading="btnLoading" style="width:100%;" @click="login()">登录</el-button>
             </el-form-item>
           </el-form>
         </div>
@@ -26,15 +26,16 @@
 </template>
 
 <script>
+// 引入gt.js文件
+import '@/assets/js/gt.js'
+// 引入iconfont图标库css文件
+import '@/assets/font/iconfont.css'
+
 export default {
 
   methods: {
-    a () { return 'abc' },
     // 管理员登录系统
     login () {
-      console.log(this)
-      console.log(this.loginForm)
-      console.log(this.a())
       // this:VueComponent对象，本身有继承Vue对象
       // this可以访问本身组件的成员(data/methods)
       // 对当前el-form表单进行校验
@@ -42,11 +43,78 @@ export default {
         // valid：true  校验成功
         // valid: false 校验失败
         if (valid) {
-          // 路由编程导航
-          this.$router.push({ name: 'home' })
+          // 判断之前有生成过窗口，就直接打开
+          if (this.catpchaObject) {
+            return this.catpchaObject.verify()
+          }
+          this.btnLoading = true // 按钮等待效果
+          // 人机交互验证
+          // 1) 获得验证的秘钥信息
+          let pro = this.$http.get(`/captchas/${this.loginForm.mobile}`)
+          pro
+            .then((result) => {
+              // console.log(result)
+              // 从result中把相关的信息解构出来
+              let { data } = result.data
+              // 显示人机窗口
+              // 请检测data的数据结构， 保证data.gt, data.challenge, data.success有值
+              window.initGeetest({
+                // 以下配置参数来自服务端 SDK
+                gt: data.gt,
+                challenge: data.challenge,
+                offline: !data.success,
+                new_captcha: true,
+                product: 'bind' // 隐藏"人机按钮"
+              }, captchaObj => {
+                // 这里可以调用验证实例 captchaObj 的实例方法
+                captchaObj.onReady(() => {
+                  // 验证码ready之后才能调用verify方法“显示验证码”
+                  captchaObj.verify() // 显示验证码
+                  this.btnLoading = false // 按钮正常了
+                  // 把生成好的窗口对象赋予给captchaObject成员
+                  this.catpchaObject = captchaObj
+                }).onSuccess(() => {
+                  // 人机验证成功
+                  // 验证账号登录系统
+                  this.loginAct()
+                }).onError(() => {
+                  // 人机验证失败
+                })
+              })
+            })
+            .catch((err) => {
+              console.log(err)
+              return this.$message.error('获得人机验证码失败！')
+            })
+
+          // 真正登录动作
+          // this.loginAct()
         }
       })
+    },
+
+    // 校验账号正确，存储token等信息，登录后台系统
+    loginAct () {
+      // 利用axios带着当前的账号跑到服务器端做真实性校验
+      // axios调用任何方法做请求，返回的结果都是"Promise对象"，这样就可以继续调用then、catch方法了
+      var pro = this.$http.post('/authorizations', this.loginForm)
+      pro
+        .then((result) => {
+          // 账号校验成功后，会把当前账号的许多信息给我们返回
+          // console.log(result) // id  name  photo  token等
+          var { name, token, photo } = result.data.data // 对象解构赋值
+          window.sessionStorage.setItem('name', name)
+          window.sessionStorage.setItem('token', token)
+          window.sessionStorage.setItem('photo', photo)
+          // 路由编程导航
+          this.$router.push({ name: 'home' })
+        })
+        .catch((err) => {
+          // 错误提示(用户名或密码错误)
+          return console.log('33333333', err)
+        })
     }
+
   },
   data () {
     var checkMobile = function (rule, value, callback) {
@@ -70,11 +138,15 @@ export default {
       callback()
     }
     return {
+      // 保存生成好的人机窗口对象
+      catpchaObject: null,
+      // 登录按钮等待设置
+      btnLoading: false,
       // 表单数据对象
       loginForm: {
-        mobile: '',
-        code: '',
-        xieyi: false
+        mobile: '18002052523',
+        code: '246810',
+        xieyi: true
       },
       loginFormRules: {
         // 校验名称(来自表单对象的成员名字)
@@ -99,9 +171,15 @@ export default {
 </script>
 
 <style lang="less" scoped>
+// html{
+//   background-color: gray;
+// }
 .login-container{
+  // margin-top: 150px;
   height:100%;
-  background-color: gray;
+  // background-color: gray;
+  background-image: url('./login_bg.jpg');
+  background-size: cover;
   display:flex;
   justify-content: center;
   align-items: center;

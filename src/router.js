@@ -16,8 +16,9 @@ var router = new Router({
       children: [
         // { path: '/home', redirect: '/welcome' },  // 重定向2
         // 配置子路由
-        { path: '/welcome', name: 'welcome', component: () => import('@/views/welcome') }
-        // { path: '/article', name: 'article', component: () => import('@/views/article') }
+        { path: '/welcome', name: 'welcome', component: () => import('@/views/welcome') },
+        { path: '/article', name: 'article', component: () => import('@/views/article') },
+        { path: '/account', name: 'account', component: () => import('@/views/account') }
       ]
     }
   ]
